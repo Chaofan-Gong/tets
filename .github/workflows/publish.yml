@@ -1,46 +1,79 @@
 name: Publish
 
+# 触发规则：推送到任意分支都触发，也可改为仅main分支（branches: ['main']）
 on:
   push:
     branches: ['*']
+  # 可选：打版本标签时触发（比如 v1.0.0），更符合发布规范
+  # tags: ['v*']
 
 jobs:
   publish:
-    # To enable auto publishing to github, update your electron publisher
-    # config in package.json > "build" and remove the conditional below
-    if: ${{ github.repository_owner == 'electron-react-boilerplate' }}
-
+    # 移除原有的仓库所有者限制（这是导致任务跳过的核心原因）
     runs-on: ${{ matrix.os }}
-
+    # 多平台构建矩阵：同时在mac/win/linux上打包
     strategy:
+      fail-fast: false  # 一个平台失败不影响其他平台
       matrix:
-        os: [macos-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout git repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 升级到最新版
 
       - name: Install Node and NPM
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install and build
+      - name: Install dependencies (macOS/Linux)
+        if: matrix.os != 'windows-latest'
         run: |
           npm install
           npm run postinstall
           npm run build
 
-      - name: Publish releases
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          npm install
+          npm run postinstall
+          npm run build
+        shell: pwsh
+
+      # 打包并发布到GitHub Release
+      - name: Build and publish
         env:
-          # The APPLE_* values are used for auto updates signing
+          # 苹果签名相关（仅macOS生效，无证书可注释，打包时会自动跳过签名）
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASS }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # This is used for uploading release assets to github
+          # GitHub发布令牌（自动生成，无需手动配置）
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm exec electron-builder -- --publish always --win --mac --linux
+          # 仅为当前系统打包（避免跨系统打包失败）
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npm exec electron-builder -- --publish always --mac
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            npm exec electron-builder -- --publish always --win
+          else
+            npm exec electron-builder -- --publish always --linux
+          fi
+        # Windows系统用pwsh执行
+        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+
+      # 上传产物到Actions Artifacts（备用下载方式）
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-installer
+          path: |
+            release/build/*.exe
+            release/build/*.dmg
+            release/build/*.AppImage
+            release/build/*.deb
+            release/build/*.rpm
+          retention-days: 30  # 产物保留30天
