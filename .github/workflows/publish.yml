@@ -10,6 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # 恢复全部三个平台
         os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
@@ -37,14 +38,16 @@ jobs:
           npm run build
         shell: pwsh
 
-      # 打包并发布到 GitHub Release（macOS/Linux，跳过签名）
+      # 打包并发布到 GitHub Release（macOS/Linux）
       - name: Build and publish (macOS/Linux)
         if: matrix.os != 'windows-latest'
         env:
+          # 不设置苹果签名相关变量，electron-builder 会自动跳过签名
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npm exec electron-builder -- --publish always --mac --no-sign
+            # 移除错误的 --no-sign 参数
+            npm exec electron-builder -- --publish always --mac
           else
             npm exec electron-builder -- --publish always --linux
           fi
