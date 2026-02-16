@@ -3,8 +3,6 @@ name: Publish
 on:
   push:
     branches: ['*']
-  # 可选：仅打版本标签时触发（更规范）
-  # tags: ['v*']
 
 jobs:
   publish:
@@ -39,19 +37,14 @@ jobs:
           npm run build
         shell: pwsh
 
-      # 打包并发布到 GitHub Release（macOS/Linux）
+      # 打包并发布到 GitHub Release（macOS/Linux，跳过签名）
       - name: Build and publish (macOS/Linux)
         if: matrix.os != 'windows-latest'
         env:
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASS }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npm exec electron-builder -- --publish always --mac
+            npm exec electron-builder -- --publish always --mac --no-sign
           else
             npm exec electron-builder -- --publish always --linux
           fi
