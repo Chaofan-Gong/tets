@@ -1,25 +1,22 @@
 name: Publish
 
-# 触发规则：推送到任意分支都触发，也可改为仅main分支（branches: ['main']）
 on:
   push:
     branches: ['*']
-  # 可选：打版本标签时触发（比如 v1.0.0），更符合发布规范
+  # 可选：仅打版本标签时触发（更规范）
   # tags: ['v*']
 
 jobs:
   publish:
-    # 移除原有的仓库所有者限制（这是导致任务跳过的核心原因）
     runs-on: ${{ matrix.os }}
-    # 多平台构建矩阵：同时在mac/win/linux上打包
     strategy:
-      fail-fast: false  # 一个平台失败不影响其他平台
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout git repo
-        uses: actions/checkout@v4  # 升级到最新版
+        uses: actions/checkout@v4
 
       - name: Install Node and NPM
         uses: actions/setup-node@v4
@@ -42,30 +39,34 @@ jobs:
           npm run build
         shell: pwsh
 
-      # 打包并发布到GitHub Release
-      - name: Build and publish
+      # 打包并发布到 GitHub Release（macOS/Linux）
+      - name: Build and publish (macOS/Linux)
+        if: matrix.os != 'windows-latest'
         env:
-          # 苹果签名相关（仅macOS生效，无证书可注释，打包时会自动跳过签名）
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASS }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # GitHub发布令牌（自动生成，无需手动配置）
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 仅为当前系统打包（避免跨系统打包失败）
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
             npm exec electron-builder -- --publish always --mac
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            npm exec electron-builder -- --publish always --win
           else
             npm exec electron-builder -- --publish always --linux
           fi
-        # Windows系统用pwsh执行
-        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+        shell: bash
 
-      # 上传产物到Actions Artifacts（备用下载方式）
+      # 打包并发布到 GitHub Release（Windows）
+      - name: Build and publish (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm exec electron-builder -- --publish always --win
+        shell: pwsh
+
+      # 上传产物到 Actions Artifacts（备用）
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -76,4 +77,4 @@ jobs:
             release/build/*.AppImage
             release/build/*.deb
             release/build/*.rpm
-          retention-days: 30  # 产物保留30天
+          retention-days: 30
