@@ -10,7 +10,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 恢复全部三个平台
         os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
@@ -42,14 +41,14 @@ jobs:
       - name: Build and publish (macOS/Linux)
         if: matrix.os != 'windows-latest'
         env:
-          # 不设置苹果签名相关变量，electron-builder 会自动跳过签名
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # 移除错误的 --no-sign 参数
-            npm exec electron-builder -- --publish always --mac
+            # macOS: 仅生成 .dmg
+            npm exec electron-builder -- --publish always --mac --dmg
           else
-            npm exec electron-builder -- --publish always --linux
+            # Linux: 仅生成 .deb
+            npm exec electron-builder -- --publish always --linux --deb
           fi
         shell: bash
 
@@ -59,10 +58,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm exec electron-builder -- --publish always --win
+          # Windows: 仅生成 .exe (NSIS 安装包)
+          npm exec electron-builder -- --publish always --win --x64 --nsis
         shell: pwsh
 
-      # 上传产物到 Actions Artifacts（备用）
+      # 上传产物到 Actions Artifacts（备用，保留 30 天）
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -70,7 +70,5 @@ jobs:
           path: |
             release/build/*.exe
             release/build/*.dmg
-            release/build/*.AppImage
             release/build/*.deb
-            release/build/*.rpm
           retention-days: 30
