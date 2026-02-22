@@ -44,11 +44,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # macOS: 仅生成 .dmg
-            npm exec electron-builder -- --publish always --mac --dmg
+            # 修正：--mac 后面直接跟 dmg
+            npm exec electron-builder -- --publish always --mac dmg
           else
-            # Linux: 仅生成 .deb
-            npm exec electron-builder -- --publish always --linux --deb
+            # 修正：--linux 后面直接跟 deb
+            npm exec electron-builder -- --publish always --linux deb
           fi
         shell: bash
 
@@ -58,11 +58,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Windows: 仅生成 .exe (NSIS 安装包)
-          npm exec electron-builder -- --publish always --win --x64 --nsis
+          # 修正：--win 后面直接跟 nsis，且 --x64 放在前面
+          npm exec electron-builder -- --publish always --x64 --win nsis
         shell: pwsh
 
-      # 上传产物到 Actions Artifacts（备用，保留 30 天）
+      # 上传产物到 Actions Artifacts（备用）
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
